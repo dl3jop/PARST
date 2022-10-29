@@ -1,6 +1,6 @@
-[submodule "rpi-rotary-encoder-python"]
-	path = rpi-rotary-encoder-python
-	url = https://github.com/dl3jop/rpi-rotary-encoder-python.git
 [submodule "pysattracker"]
 	path = pysattracker
 	url = https://github.com/dl3jop/pysattracker.git
+[submodule "rpi_rotary_encoder"]
+	path = rpi_rotary_encoder
+	url = https://github.com/dl3jop/rpi-rotary-encoder-python.git
