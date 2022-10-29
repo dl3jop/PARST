@@ -1,12 +1,12 @@
 # PARST
-Portable AmateurRadio Satelite Tracker
+Portable AmateurRadio Satellite Tracker
 
 ![Image](example.gif)
 
 
 ## Introduction
 This is a WIP proof-of-concept test for a portable amateur satellite full-duplex system. A rtl-sdr is used for RX and an hamlib compatible Rig for TX (FT-818 in this case). The TLEs are parsed and matched against a list of desired satellites. The satnogs transmitter database is used as frequency lookup.
-Two external rotary encoders might be used on a RPi to control the VFO and RIT of the system
+Two external rotary encoders might be used on a RPi to control the VFO and RIT of the system.
 
 Notice: this project is Work-in-Progress. It has a lot of bugs and most probablly won't run out of the box. I'm working on it, but feel free to take part in the development!
 
