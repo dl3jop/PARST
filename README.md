@@ -5,7 +5,7 @@ Portable AmateurRadio Satelite Tracker
 
 
 ## Introduction
-This is a WIP proof-of-concept test for a portable amateursatellite full-duplex system. A rtl-sdr is used for RX and a hamlib compatible Rig for TX (FT-818 in this case). The TLEs are parsed and matched against a list of desired satellites. The satnogs transmitter database is used as frequency lookup.
+This is a WIP proof-of-concept test for a portable amateur satellite full-duplex system. A rtl-sdr is used for RX and an hamlib compatible Rig for TX (FT-818 in this case). The TLEs are parsed and matched against a list of desired satellites. The satnogs transmitter database is used as frequency lookup.
 Two externel rotary encoders might be used on a RPi to control the VFO and RIT of the system
 
 Notice: this project is Work-in-Progress. It has a lot of bugs and most ptobablly won't run out of the box. I'm working on it, but feel free to take part in the development!
@@ -31,3 +31,6 @@ A lot, I'm serious !
 - Demodulation box not implemented for leightweight demodulation chain
 - More comments, code rework
 - external configuration filefor easier deployment for new users
+
+## Credits
+- satnogs for transmmitter database
