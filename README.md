@@ -1,7 +1,7 @@
 # PARST
 Portable AmateurRadio Satelite Tracker
 
-![Image](example.png)
+![Image](example.gif)
 
 
 ## Introduction

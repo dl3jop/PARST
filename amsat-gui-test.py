@@ -117,7 +117,7 @@ def update_demod_simple_demod(demod):
         data = data +chr(demod & 0xff)
         demod = demod >> 8
         i=i+1
-    s.send(six.b(data))
+    #s.send(six.b(data))
     
 # Catalog with Satellite Data
 class SatCatalog:
