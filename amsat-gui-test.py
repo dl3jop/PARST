@@ -508,6 +508,7 @@ class Ui(QtWidgets.QMainWindow):
             self.label_rig_two.setStyleSheet(''' font-size: 20px; ''')
             self.status_rig_one.setStyleSheet(''' font-size: 20px; ''')
             self.status_rig_two.setStyleSheet(''' font-size: 20px; ''')
+            
         
             self.label_rig_one.setText(myRig.rig_name_uplink + ":")
             self.label_rig_two.setText(myRig.rig_name_downlink + ":")
@@ -542,10 +543,16 @@ class Ui(QtWidgets.QMainWindow):
             self.satellite_azimuth.setStyleSheet(''' font-size: 22px; ''')
             self.label_azimuth.setStyleSheet(''' font-size: 22px; ''')
             self.label_elevation.setStyleSheet(''' font-size: 22px; ''')
+            
             self.demod_selector.addItem("NFM")
             self.demod_selector.addItem("AM")
             self.demod_selector.addItem("LSB")
             self.demod_selector.addItem("USB")
+            
+            self.line_sep_1.setStyleSheet("background-color: #ff1744;");
+            self.line_sep_2.setStyleSheet("background-color: #ff1744;");
+            self.line_sep_3.setStyleSheet("background-color: #ff1744;");
+            self.line_sep_4.setStyleSheet("background-color: #ff1744;");
         
         self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
