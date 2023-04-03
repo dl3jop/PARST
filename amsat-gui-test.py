@@ -1,28 +1,47 @@
+#!/usr/bin/env python3
+
+# Import PyQt5 stuff
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import * 
 from PyQt5.QtGui import * 
 from PyQt5.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess
 from qt_material import apply_stylesheet
+
+# Config parser for external config file
+import configparser
+# For bash calls
 import sys
+import os
+# Time mangement
 import datetime
 import time
-#from pysattracker.sattracker import Tracker as sattracker
+# Interface for pyepehm
 import pysattracker.sattracker as sattracker
+# JSON to process SatNogs transponder file
 import json
-import os
-import signal
-import struct
+# Communication with rtl-udp
 import socket
 import six
+import struct
+# Communication with Rig
 import serial
 import Hamlib
 
-wanted_sats = ["AO-07", "AO-73", "RS-44","FO-29","ISS","SO-50","XW-2A","AO-91","AO-27", "PO-101","XW-2C","JO-97", "FO-99","CAS-4B","CAS-4A"]
-qth = ("49.0", "8.0", "320")
+#import signal
 
-
-# UI size ToDo: make it scale dynamically
-is_small_ui = 1
+### Load config file
+config_file = configparser.ConfigParser(converters={'list': lambda x: [i.strip() for i in x.split(',')]})
+config_file.sections()
+try:
+    with open('amsat-gui.config') as f:
+        config_file.read_file(f)
+except IOError:
+    print("Config file missing!")
+    exit()
+  
+### Setup QTH and Satellite information
+qth = (config_file['QTH']['latitude'],config_file['QTH']['longitude'],config_file['QTH']['elevation'])
+wanted_sats = config_file['SATS'].getlist('sat_list')
 
 ### check if the system is a rpi ## needs to be fixed
 is_rpi = 0
@@ -34,9 +53,7 @@ if (os.uname()[1] == 'raspberrypi'):
     is_rpi = 1
 
 ### which demodulator chain should be used?
-# 0) rtl-tcp + nmux + csdr -> works good on highr powered machines
-# 1) rtl_fm direct demodulation using rtl_fm fork -> better for older machines, worse rx I guess? to be tested
-demod_chain = 1;
+demod_chain = config_file['SDR']['demod_chain'];
 
 
 ### Setting up pipe to control shift for csdr
@@ -86,23 +103,22 @@ tx_rig.set_conf("rig_pathname", "/dev/ttyUSB0")
 tx_rig.set_conf("retry", "5")
 
 
-#satellite tle and transponder files
+# satellite tle and transponder files
 tle_file_path = "amsat-tle.txt"
 json_file_path = "satnogs.json"
 
 
 
-#split TLE into triple lists
+# split TLE into triple lists
 def triple(l, n):
   return [l[i:i+n] for i in range(0, len(l), n)]
-  
   
   
 def update_freq_simple_demod(freq):
     data = "" +chr(0)
     i = 0
     freq = int(freq*(1e6))
-    #print("Updated sdr demod")
+    # print("Updated sdr demod")
     while i < 4:
         data = data +chr(freq & 0xff)
         freq = freq >> 8
@@ -117,7 +133,7 @@ def update_demod_simple_demod(demod):
         data = data +chr(demod & 0xff)
         demod = demod >> 8
         i=i+1
-    #s.send(six.b(data))
+    # s.send(six.b(data))
     
 # Catalog with Satellite Data
 class SatCatalog:
@@ -475,7 +491,7 @@ class Ui(QtWidgets.QMainWindow):
         self.get_modes()
               
         
-        if(is_small_ui == 0):
+        if(config_file['UI'].getlist('legacy_ui') == 1):
             uic.loadUi('AmsatGUI.ui', self)
             self.label_DOWNLINK.setStyleSheet(''' font-size: 30px; ''')
             self.label_UPLINK.setStyleSheet(''' font-size: 30px; ''')
@@ -515,6 +531,8 @@ class Ui(QtWidgets.QMainWindow):
         
             self.status_rig_one.setText(str(myRig.rig_uplink_connected))
             self.status_rig_two.setText(str(myRig.rig_downlink_connected))
+            self.button_tpx_mid.clicked.connect(self.reset_tpx_offset)
+            
         else:
             uic.loadUi('AmsatGUI-small.ui', self)
             self.label_DOWNLINK.setStyleSheet(''' font-size: 24px; ''')
@@ -570,8 +588,7 @@ class Ui(QtWidgets.QMainWindow):
         self.slider_tpx.valueChanged.connect(self.update_tpx_offset)
         # Unused, WIP
         #self.demod_selector.currentIndexChanged.connect(update_demod_simple_demod)
-        #self.button_tpx_mid.clicked.connect(self.reset_tpx_offset)
-        
+                
         if (is_rpi == 1):
             enc_vfo = Encoder(16, 20, 21, self.valueChanged_VFO)
             enc_rit = Encoder(26, 19, 13, self.valueChanged_RIT)
