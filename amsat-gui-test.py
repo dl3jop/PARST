@@ -571,6 +571,7 @@ class Ui(QtWidgets.QMainWindow):
             self.line_sep_2.setStyleSheet("background-color: #ff1744;");
             self.line_sep_3.setStyleSheet("background-color: #ff1744;");
             self.line_sep_4.setStyleSheet("background-color: #ff1744;");
+            self.line_sep_5.setStyleSheet("background-color: #ff1744;");
         
         self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
