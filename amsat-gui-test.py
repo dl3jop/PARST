@@ -58,6 +58,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
+from math import radians
     
     
   
@@ -327,7 +328,6 @@ class sdr_rx(QObject):
 
 class Ui(QtWidgets.QMainWindow):
     def resizeEvent(self, event):
-        print("Window has been resized")
         QtWidgets.QMainWindow.resizeEvent(self, event)
         #self.polarplot_widget.resize((int(self.current_pass_tab.width()/2),self.current_pass_tab.height()-50))
         self.polarplot_widget.setMaximumHeight(self.current_pass_tab.height())
@@ -623,6 +623,7 @@ class Ui(QtWidgets.QMainWindow):
         self.update_frequencies(0)
         
         self.satellite_selector.currentIndexChanged.connect(self.comboboxMode_set_entries)
+        self.satellite_selector.currentIndexChanged.connect(self.plot_graph)
         self.mode_selector.currentIndexChanged.connect(self.update_selected_tpx)
         self.slider_tpx.valueChanged.connect(self.update_tpx_offset)
         # Unused, WIP
@@ -658,11 +659,16 @@ class Ui(QtWidgets.QMainWindow):
         r = np.arange(0, 60, 0.2)
         r = np.append(r, r[::-1])
         theta = np.arange(0, np.pi, (np.pi/600))
+        
+        azimuth, elevation = mySats.tracker_list[mySats.current_sat].next_pass_table(30)
+        azimuth = [radians(i) for i in azimuth]
+        for i in range(len(azimuth)):
+            print("Azi:" + str(azimuth[i]) + "  Ele:" + str(elevation[i]))
         self.pass_chart.clear() 
         ax = self.pass_chart.subplots(subplot_kw={'projection': 'polar'})
-        ax.plot(theta, r)
+        ax.plot(azimuth, elevation)
         ax.grid(True)
-        ax.set_theta_direction(1)
+        ax.set_theta_direction(-1)
         ax.set_theta_offset(np.pi/2)
         ax.set_rlim(bottom=90, top=0)
         self.pass_chart.tight_layout()
