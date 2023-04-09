@@ -71,7 +71,7 @@ is_rpi = 0
 if (os.uname()[1] == 'raspberrypi'):
     print("It's a PI")
     import RPi.GPIO as GPIO
-    from rpi_rotary_encoder_python.encoder import Encoder
+    from rpi_rotary_encoder.encoder import Encoder
     GPIO.setmode(GPIO.BCM)
     is_rpi = 1
 
@@ -82,7 +82,7 @@ demod_chain = config_file['SDR']['demod_chain'];
 ### Setting up pipe to control shift for csdr
 csdr_shift_fifo_path = 'sdr_rx_tune_pipe'
 
-if(demod_chain == 0):
+if(demod_chain == "0"):
     try:
         os.remove(csdr_shift_fifo_path)
     except:
@@ -274,7 +274,7 @@ class sdr_rx(QObject):
     def __init__(self):
         super(sdr_rx, self).__init__()
         print("initialising sdr...")
-        if(demod_chain == 0):
+        if(demod_chain == "0"):
             rtl_tcp_proc.readyReadStandardOutput.connect(self.rtl_output)
             nmux_proc.readyReadStandardOutput.connect(self.nmux_output)
             demod_proc.readyReadStandardOutput.connect(self.demod_output)
@@ -285,7 +285,7 @@ class sdr_rx(QObject):
             time.sleep(1)
             demod_proc.start(csdr_lsb_command)
             time.sleep(3)
-        elif(demod_chain == 1):
+        elif(demod_chain == "1"):
             print("Starting simple demod")
             sdr_demod_simple_proc.readyReadStandardError.connect(self.simple_demod_stderr)
             #sdr_demod_simple_proc.readyReadStandardOutput.connect(self.simple_demod_stdout)
@@ -488,7 +488,7 @@ class Ui(QtWidgets.QMainWindow):
             myRig.trigger_uplink_changed = 1
             #tx_rig.set_freq(Hamlib.RIG_VFO_A,float(int(myFreqs.current_rig_uplink*1e6)))
             
-        if(demod_chain == 0):
+        if(demod_chain == "0"):
             if (myFreqs.current_downlink < 28000000):
                 myFreqs.current_downlink = 28000000
             # if rx is more than 1 MHz rom tune frequency, retune 500 kHz below rx
@@ -499,7 +499,7 @@ class Ui(QtWidgets.QMainWindow):
             
             myFreqs.sdr_shift = float(myFreqs.sdr_pll_freq - myFreqs.current_downlink)/myFreqs.sdr_samplerate
             os.write(csdr_shift_fifo_file,str.encode("%+.6f\n" % myFreqs.sdr_shift))
-        elif(demod_chain == 1):
+        elif(demod_chain == "1"):
             try:
                 s.connect(("127.0.0.1", 6020))
                 update_freq_simple_demod(myFreqs.current_rig_downlink)
@@ -513,7 +513,8 @@ class Ui(QtWidgets.QMainWindow):
         super(Ui, self).__init__()
         
         ### Enable to remove frame
-        #self.setWindowFlag(Qt.FramelessWindowHint)
+        self.setWindowFlag(Qt.FramelessWindowHint)
+        #self.showFullScreen()
         
         self.get_satellites()
         self.get_modes()
