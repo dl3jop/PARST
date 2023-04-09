@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-# Import PyQt5 stuff
-from PyQt5 import QtWidgets, uic, QtChart, QtGui
-from PyQt5.QtChart import QPolarChart, QValueAxis, QChartView
-from PyQt5.QtWidgets import * 
-from PyQt5.QtGui import * 
-from PyQt5.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
+# Import PyQt6 stuff
+from PyQt6 import QtWidgets, uic, QtGui
+from PyQt6.QtWidgets import * 
+from PyQt6.QtGui import * 
+from PyQt6.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
 from qt_material import apply_stylesheet
 
 import matplotlib
@@ -598,8 +597,8 @@ class Ui(QtWidgets.QMainWindow):
     
             
         
-        self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        #self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        #self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         
         
@@ -608,7 +607,6 @@ class Ui(QtWidgets.QMainWindow):
         self.update_selected_tpx(0)
         self.update_frequencies(0)
         
-        self.satellite_selector.activated[str].connect(self.update_sat_ele)
         self.satellite_selector.currentIndexChanged.connect(self.comboboxMode_set_entries)
         self.mode_selector.currentIndexChanged.connect(self.update_selected_tpx)
         self.slider_tpx.valueChanged.connect(self.update_tpx_offset)
@@ -668,7 +666,7 @@ def application_exit_handler():
 app = QtWidgets.QApplication(sys.argv)
 app.aboutToQuit.connect(application_exit_handler)
 window = Ui()
-app.exec_()
+app.exec()
 
 
 
