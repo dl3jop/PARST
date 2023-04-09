@@ -21,7 +21,7 @@ import struct
 import serial
 import Hamlib
 
-#import signal
+import signal
 
 ### Load config file
 config_file = configparser.ConfigParser(converters={'list': lambda x: [i.strip() for i in x.split(',')]})
@@ -91,7 +91,7 @@ if(demod_chain == "0"):
     try:
         os.mkfifo(csdr_shift_fifo_path)
     except:
-        print("Error creating FIFO, aborting...")
+        print("Error creating tuning FIFO, aborting...")
         exit()
     
     time.sleep(1)
@@ -99,18 +99,29 @@ if(demod_chain == "0"):
         csdr_shift_fifo_file = os.open(csdr_shift_fifo_path, os.O_RDWR)
     except:
         print("Error opening FIFO, exiting...")
-
+  
 
 ### SDR commands
+
+### rtl_tcp + nmux + csdr -> heavy but allows multiple commands in parallel
 rtl_tcp_command = "rtl_tcp -a 127.0.0.1 -s 2.4M -p 4950 -f 145.5M -g 20 "
 csdr_lsb_command = "bash -c \"(for anything in {0..10}; do ncat 127.0.0.1 4952; sleep .3; done) | csdr convert_u8_f | csdr shift_addition_cc --fifo sdr_rx_tune_pipe | csdr fir_decimate_cc 50 0.005 HAMMING | csdr bandpass_fir_fft_cc -0.1 0 0.05 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded - \""
 iq_mux_command = "bash -c \"(for anything in {0..10}; do ncat 127.0.0.1 4950; sleep .3; done) | nmux -p 4952 -a 127.0.0.1 -b 1024 -n 30\""
 
 ### better for older hardware like Raspberry Pi 2 and alike 
 ## FM
-#sdr_simple_command = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -g 20 - | csdr convert_s16_f | csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
-## USB
-sdr_simple_command = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -g 20 - | csdr convert_s16_f | csdr bandpass_fir_fft_cc 0 0.05 0.005| csdr realpart_cf | csdr agc_ff --profile slow | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+sdr_simple_command = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -g 20 - | csdr convert_s16_f | csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+
+### hybrid version
+sdr_hybrid_iq = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -C -g 20 - | csdr convert_s16_f| nmux -p 4952 -a 127.0.0.1 -b 1024 -n 30 \""
+sdr_hybrid_command_usb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc 0.01 0.17 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+sdr_hybrid_command_lsb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc -0.17 -0.01 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+sdr_hybrid_command_nfm = "bash -c \"nc -v localhost 4952 |csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+
+demod_list = "NFM", "LSB", "USB"
+demod_command_list = [sdr_hybrid_command_nfm, sdr_hybrid_command_lsb, sdr_hybrid_command_usb]
+##
+
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -118,6 +129,9 @@ nmux_proc = QProcess()
 demod_proc = QProcess()
 rtl_tcp_proc = QProcess()
 sdr_demod_simple_proc = QProcess()
+
+sdr_hybrid_iq_proc = QProcess()
+sdr_hybrid_demod_proc = QProcess()
 
 # Halmlib config
 Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
@@ -191,6 +205,7 @@ class FreqManager:
     
     # Current selected TPX of Sat
     current_tpx = 0;
+    current_demod = 0;
     
     # doppler shifts
     doppler_up = 0;
@@ -290,6 +305,13 @@ class sdr_rx(QObject):
             sdr_demod_simple_proc.readyReadStandardError.connect(self.simple_demod_stderr)
             #sdr_demod_simple_proc.readyReadStandardOutput.connect(self.simple_demod_stdout)
             sdr_demod_simple_proc.start(sdr_simple_command)
+            
+        elif(demod_chain == "2"):
+            print("Starting hybrid demod")
+            sdr_hybrid_iq_proc.readyReadStandardError.connect(self.hybrid_iq_stderr)
+            sdr_hybrid_iq_proc.start(sdr_hybrid_iq)
+            sdr_hybrid_demod_proc.readyReadStandardError.connect(self.hybrid_demod_stderr)
+            sdr_hybrid_demod_proc.start(demod_command_list[myFreqs.current_demod])
 
     def rtl_output(self):
         data = rtl_tcp_proc.readAllStandardOutput()
@@ -318,6 +340,31 @@ class sdr_rx(QObject):
         stdout = bytes(data).decode("utf8")
         print("DEMOD: " + stdout)
         print("###")
+    def hybrid_iq_stderr(self):
+        data = sdr_hybrid_iq_proc.readAllStandardError()
+        stdout = bytes(data).decode("utf8")
+        print("DEMOD: " + stdout)
+    def hybrid_iq_stdout(self):
+        data = sdr_hybrid_iq_proc.readAllStandardOutput()
+        stdout = bytes(data).decode("utf8")
+        print("DEMOD: " + stdout)
+        print("###")
+    def hybrid_demod_stderr(self):
+        data = sdr_hybrid_demod_proc.readAllStandardError()
+        stdout = bytes(data).decode("utf8")
+        print("DEMOD: " + stdout)
+    def hybrid_demod_stdout(self):
+        data = sdr_hybrid_demod_proc.readAllStandardOutput()
+        stdout = bytes(data).decode("utf8")
+        print("DEMOD: " + stdout)
+        print("###")
+        
+    def change_demod_hybrid():
+        print("Demod:" + str(myFreqs.current_demod))
+        sdr_hybrid_demod_proc.terminate()
+        sdr_hybrid_demod_proc.waitForFinished()
+
+        sdr_hybrid_demod_proc.start(demod_command_list[myFreqs.current_demod])
     
     ### runtime sanity check to be implemented    
     def run(self):
@@ -394,6 +441,10 @@ class Ui(QtWidgets.QMainWindow):
     def update_selected_tpx(self,index):
         myFreqs.current_tpx = index;
         self.update_frequencies(index)
+    
+    def update_selected_demod(self,index):
+        myFreqs.current_demod = index;
+        sdr_rx.change_demod_hybrid()
     
     
     ### get frequencies from tpx database and get tpx mode
@@ -513,8 +564,7 @@ class Ui(QtWidgets.QMainWindow):
         super(Ui, self).__init__()
         
         ### Enable to remove frame
-        self.setWindowFlag(Qt.FramelessWindowHint)
-        #self.showFullScreen()
+        #self.setWindowFlag(Qt.FramelessWindowHint)
         
         self.get_satellites()
         self.get_modes()
@@ -591,10 +641,9 @@ class Ui(QtWidgets.QMainWindow):
             self.label_azimuth.setStyleSheet(''' font-size: 22px; ''')
             self.label_elevation.setStyleSheet(''' font-size: 22px; ''')
             
-            self.demod_selector.addItem("NFM")
-            self.demod_selector.addItem("AM")
-            self.demod_selector.addItem("LSB")
-            self.demod_selector.addItem("USB")
+
+            for d in demod_list:
+                self.demod_selector.addItem(d)
             
             self.line_sep_1.setStyleSheet("background-color: #ff1744;");
             self.line_sep_2.setStyleSheet("background-color: #ff1744;");
@@ -628,7 +677,7 @@ class Ui(QtWidgets.QMainWindow):
         self.mode_selector.currentIndexChanged.connect(self.update_selected_tpx)
         self.slider_tpx.valueChanged.connect(self.update_tpx_offset)
         # Unused, WIP
-        #self.demod_selector.currentIndexChanged.connect(update_demod_simple_demod)
+        self.demod_selector.currentIndexChanged.connect(self.update_selected_demod)
                 
         if (is_rpi == 1):
             enc_vfo = Encoder(16, 20, 21, self.valueChanged_VFO)
@@ -657,14 +706,9 @@ class Ui(QtWidgets.QMainWindow):
         apply_stylesheet(app, theme='dark_red.xml')
         
     def plot_graph(self):
-        r = np.arange(0, 60, 0.2)
-        r = np.append(r, r[::-1])
-        theta = np.arange(0, np.pi, (np.pi/600))
         
         azimuth, elevation = mySats.tracker_list[mySats.current_sat].next_pass_table(30)
         azimuth = [radians(i) for i in azimuth]
-        for i in range(len(azimuth)):
-            print("Azi:" + str(azimuth[i]) + "  Ele:" + str(elevation[i]))
         self.pass_chart.clear() 
         ax = self.pass_chart.subplots(subplot_kw={'projection': 'polar'})
         ax.plot(azimuth, elevation)
@@ -676,6 +720,8 @@ class Ui(QtWidgets.QMainWindow):
         self.polarplot_widget.draw()
         self.polarplot_widget.setMaximumHeight(self.current_pass_tab.height())
         self.polarplot_widget.setMaximumWidth(int(self.current_pass_tab.width()/2))
+        self.polarplot_widget.setMinimumHeight(self.current_pass_tab.height())
+        self.polarplot_widget.setMinimumWidth(int(self.current_pass_tab.width()/2))
 		
 
 def application_exit_handler():
@@ -683,6 +729,8 @@ def application_exit_handler():
     os.kill(demod_proc.processId(), signal.SIGKILL)
     os.kill(nmux_proc.processId(), signal.SIGKILL)
     os.kill(sdr_demod_simple_proc.processId(), signal.SIGKILL)
+    os.kill(sdr_hybrid_iq_proc.processId(), signal.SIGKILL)
+    os.kill(sdr_hybrid_demod_proc.processId(), signal.SIGKILL)
     
 
 app = QtWidgets.QApplication(sys.argv)
