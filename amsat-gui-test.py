@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 
 # Import PyQt5 stuff
-from PyQt5 import QtWidgets, uic
+from PyQt5 import QtWidgets, uic, QtChart, QtGui
+from PyQt5.QtChart import QPolarChart, QValueAxis, QChartView
 from PyQt5.QtWidgets import * 
 from PyQt5.QtGui import * 
-from PyQt5.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess
+from PyQt5.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
 from qt_material import apply_stylesheet
+
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Config parser for external config file
 import configparser
@@ -304,8 +312,14 @@ class sdr_rx(QObject):
         
 
 class Ui(QtWidgets.QMainWindow):
-	
-	
+    def resizeEvent(self, event):
+        print("Window has been resized")
+        QtWidgets.QMainWindow.resizeEvent(self, event)
+        #self.polarplot_widget.resize((int(self.current_pass_tab.width()/2),self.current_pass_tab.height()-50))
+        self.polarplot_widget.setMaximumHeight(self.current_pass_tab.height())
+        self.polarplot_widget.setMaximumWidth(int(self.current_pass_tab.width()/2))
+        self.polarplot_widget.setMinimumHeight(self.current_pass_tab.height())
+        self.polarplot_widget.setMinimumWidth(int(self.current_pass_tab.width()/2))
 	### Update Ele/Azi labels
     def update_sat_ele(self,text):
         self.satellite_elevation.setText(text)
@@ -572,6 +586,17 @@ class Ui(QtWidgets.QMainWindow):
             self.line_sep_3.setStyleSheet("background-color: #ff1744;");
             self.line_sep_4.setStyleSheet("background-color: #ff1744;");
             self.line_sep_5.setStyleSheet("background-color: #ff1744;");
+            
+            self.pass_chart = plt.figure()
+            self.pass_chart.tight_layout()
+            
+            self.polarplot_widget = FigureCanvasQTAgg(self.pass_chart)
+            self.polarplot_widget.setParent(self.current_pass_tab)
+            self.pushButton.clicked.connect(self.plot_graph)
+            self.plot_graph()
+            self.tabWidget.setCurrentIndex(0) 
+    
+            
         
         self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -615,6 +640,23 @@ class Ui(QtWidgets.QMainWindow):
         
         self.show()
         apply_stylesheet(app, theme='dark_red.xml')
+        
+    def plot_graph(self):
+        r = np.arange(0, 60, 0.2)
+        r = np.append(r, r[::-1])
+        theta = np.arange(0, np.pi, (np.pi/600))
+        self.pass_chart.clear() 
+        ax = self.pass_chart.subplots(subplot_kw={'projection': 'polar'})
+        ax.plot(theta, r)
+        ax.grid(True)
+        ax.set_theta_direction(1)
+        ax.set_theta_offset(np.pi/2)
+        ax.set_rlim(bottom=90, top=0)
+        self.pass_chart.tight_layout()
+        self.polarplot_widget.draw()
+        self.polarplot_widget.setMaximumHeight(self.current_pass_tab.height())
+        self.polarplot_widget.setMaximumWidth(int(self.current_pass_tab.width()/2))
+		
 
 def application_exit_handler():
     os.kill(rtl_tcp_proc.processId(), signal.SIGKILL)
