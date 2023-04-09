@@ -113,7 +113,7 @@
                </font>
               </property>
               <property name="text">
-               <string>Downlink</string>
+               <string>Uplink</string>
               </property>
               <property name="scaledContents">
                <bool>true</bool>
@@ -150,7 +150,7 @@
                </font>
               </property>
               <property name="text">
-               <string>Uplink</string>
+               <string>Downlink</string>
               </property>
               <property name="scaledContents">
                <bool>true</bool>
@@ -795,7 +795,7 @@
         </sizepolicy>
        </property>
        <attribute name="title">
-        <string>Current Pass</string>
+        <string>Next Pass</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_11">
         <item>
@@ -806,13 +806,18 @@
           <item>
            <widget class="QPushButton" name="pushButton">
             <property name="text">
-             <string>PushButton</string>
+             <string>Update</string>
             </property>
            </widget>
           </item>
          </layout>
         </item>
        </layout>
+      </widget>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>Settings</string>
+       </attribute>
       </widget>
      </widget>
     </item>

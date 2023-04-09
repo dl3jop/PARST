@@ -117,9 +117,10 @@ sdr_hybrid_iq = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -C -g 20 - | csdr
 sdr_hybrid_command_usb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc 0.01 0.17 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
 sdr_hybrid_command_lsb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc -0.17 -0.01 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
 sdr_hybrid_command_nfm = "bash -c \"nc -v localhost 4952 |csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
+sdr_hybrid_command_mute = ""
 
-demod_list = "NFM", "LSB", "USB"
-demod_command_list = [sdr_hybrid_command_nfm, sdr_hybrid_command_lsb, sdr_hybrid_command_usb]
+demod_list = "NFM", "LSB", "USB", "Mute"
+demod_command_list = [sdr_hybrid_command_nfm, sdr_hybrid_command_lsb, sdr_hybrid_command_usb, sdr_hybrid_command_mute]
 ##
 
 
@@ -558,6 +559,10 @@ class Ui(QtWidgets.QMainWindow):
                 pass
 
 
+    def update_tab_widget(self,index):
+        if(index == 1):
+            self.plot_graph()
+            
 
 		  
     def __init__(self):
@@ -569,115 +574,62 @@ class Ui(QtWidgets.QMainWindow):
         self.get_satellites()
         self.get_modes()
               
-        
-        if(config_file['UI'].getlist('legacy_ui') == 1):
-            uic.loadUi('AmsatGUI.ui', self)
-            self.label_DOWNLINK.setStyleSheet(''' font-size: 30px; ''')
-            self.label_UPLINK.setStyleSheet(''' font-size: 30px; ''')
-            self.label_RIT.setStyleSheet(''' font-size: 24px; ''')
-            self.freqRIT.setStyleSheet(''' font-size: 24px; ''')
-            self.label_tpx_lower_limit.setStyleSheet(''' font-size: 18px; ''')
-            self.label_tpx_upper_limit.setStyleSheet(''' font-size: 18px; ''')
-            self.label_tpx_mid.setStyleSheet(''' font-size: 18px; ''')
-        
-            self.label_uplink_tpx.setStyleSheet(''' font-size: 16px; ''')
-            self.label_downlink_tpx.setStyleSheet(''' font-size: 16px; ''')
-            self.label_doppler_up.setStyleSheet(''' font-size: 16px; ''')
-            self.label_doppler_down.setStyleSheet(''' font-size: 16px; ''')
-        
-            self.uplink_tpx.setStyleSheet(''' font-size: 16px; ''')
-            self.downlink_tpx.setStyleSheet(''' font-size: 16px; ''')
-            self.doppler_up.setStyleSheet(''' font-size: 16px; ''')
-            self.doppler_down.setStyleSheet(''' font-size: 16px; ''')
-        
-            self.label_satellite.setStyleSheet(''' font-size: 24px; ''')
-            self.label_mode.setStyleSheet(''' font-size: 24px; ''')
-            #self.label_demod.setStyleSheet(''' font-size: 24px; ''')
-        
-            self.satellite_elevation.setStyleSheet(''' font-size: 28px; ''')
-            self.satellite_azimuth.setStyleSheet(''' font-size: 28px; ''')
-            self.label_azimuth.setStyleSheet(''' font-size: 28px; ''')
-            self.label_elevation.setStyleSheet(''' font-size: 28px; ''')
-        
-            self.label_rig_one.setStyleSheet(''' font-size: 20px; ''')
-            self.label_rig_two.setStyleSheet(''' font-size: 20px; ''')
-            self.status_rig_one.setStyleSheet(''' font-size: 20px; ''')
-            self.status_rig_two.setStyleSheet(''' font-size: 20px; ''')
-            
-        
-            self.label_rig_one.setText(myRig.rig_name_uplink + ":")
-            self.label_rig_two.setText(myRig.rig_name_downlink + ":")
-        
-            self.status_rig_one.setText(str(myRig.rig_uplink_connected))
-            self.status_rig_two.setText(str(myRig.rig_downlink_connected))
-            self.button_tpx_mid.clicked.connect(self.reset_tpx_offset)
-            
-        else:
-            uic.loadUi('AmsatGUI-small.ui', self)
-            self.label_DOWNLINK.setStyleSheet(''' font-size: 24px; ''')
-            self.label_UPLINK.setStyleSheet(''' font-size: 24px; ''')
-            self.label_RIT.setStyleSheet(''' font-size: 18px; ''')
-            self.freqRIT.setStyleSheet(''' font-size: 18px; ''')
-            self.label_tpx_lower_limit.setStyleSheet(''' font-size: 12px; ''')
-            self.label_tpx_upper_limit.setStyleSheet(''' font-size: 12px; ''')
-            self.label_tpx_mid.setStyleSheet(''' font-size: 12px; ''')
-        
-            self.label_uplink_tpx.setStyleSheet(''' font-size: 20px; ''')
-            self.label_downlink_tpx.setStyleSheet(''' font-size: 20px; ''')
-            self.label_doppler_up.setStyleSheet(''' font-size: 20px; ''')
-            self.label_doppler_down.setStyleSheet(''' font-size: 20px; ''')
-        
-            self.uplink_tpx.setStyleSheet(''' font-size: 20px; ''')
-            self.downlink_tpx.setStyleSheet(''' font-size: 20px; ''')
-            self.doppler_up.setStyleSheet(''' font-size: 20px; ''')
-            self.doppler_down.setStyleSheet(''' font-size: 20px; ''')
-        
-            self.label_satellite.setStyleSheet(''' font-size: 22px; ''')
-            self.label_mode.setStyleSheet(''' font-size: 22px; ''')
-            self.label_demod.setStyleSheet(''' font-size: 22px; ''')
-        
-            self.satellite_elevation.setStyleSheet(''' font-size: 22px; ''')
-            self.satellite_azimuth.setStyleSheet(''' font-size: 22px; ''')
-            self.label_azimuth.setStyleSheet(''' font-size: 22px; ''')
-            self.label_elevation.setStyleSheet(''' font-size: 22px; ''')
-            
-
-            for d in demod_list:
-                self.demod_selector.addItem(d)
-            
-            self.line_sep_1.setStyleSheet("background-color: #ff1744;");
-            self.line_sep_2.setStyleSheet("background-color: #ff1744;");
-            self.line_sep_3.setStyleSheet("background-color: #ff1744;");
-            self.line_sep_4.setStyleSheet("background-color: #ff1744;");
-            self.line_sep_5.setStyleSheet("background-color: #ff1744;");
-            
-            self.pass_chart = plt.figure()
-            self.pass_chart.tight_layout()
-            
-            self.polarplot_widget = FigureCanvasQTAgg(self.pass_chart)
-            self.polarplot_widget.setParent(self.current_pass_tab)
-            self.pushButton.clicked.connect(self.plot_graph)
-            self.plot_graph()
-            self.tabWidget.setCurrentIndex(0) 
+        uic.loadUi('AmsatGUI-small.ui', self)
+        self.label_DOWNLINK.setStyleSheet(''' font-size: 24px; ''')
+        self.label_UPLINK.setStyleSheet(''' font-size: 24px; ''')
+        self.label_RIT.setStyleSheet(''' font-size: 18px; ''')
+        self.freqRIT.setStyleSheet(''' font-size: 18px; ''')
+        self.label_tpx_lower_limit.setStyleSheet(''' font-size: 12px; ''')
+        self.label_tpx_upper_limit.setStyleSheet(''' font-size: 12px; ''')
+        self.label_tpx_mid.setStyleSheet(''' font-size: 12px; ''')
     
-            
+        self.label_uplink_tpx.setStyleSheet(''' font-size: 20px; ''')
+        self.label_downlink_tpx.setStyleSheet(''' font-size: 20px; ''')
+        self.label_doppler_up.setStyleSheet(''' font-size: 20px; ''')
+        self.label_doppler_down.setStyleSheet(''' font-size: 20px; ''')
+    
+        self.uplink_tpx.setStyleSheet(''' font-size: 20px; ''')
+        self.downlink_tpx.setStyleSheet(''' font-size: 20px; ''')
+        self.doppler_up.setStyleSheet(''' font-size: 20px; ''')
+        self.doppler_down.setStyleSheet(''' font-size: 20px; ''')
+    
+        self.label_satellite.setStyleSheet(''' font-size: 22px; ''')
+        self.label_mode.setStyleSheet(''' font-size: 22px; ''')
+        self.label_demod.setStyleSheet(''' font-size: 22px; ''')
+    
+        self.satellite_elevation.setStyleSheet(''' font-size: 22px; ''')
+        self.satellite_azimuth.setStyleSheet(''' font-size: 22px; ''')
+        self.label_azimuth.setStyleSheet(''' font-size: 22px; ''')
+        self.label_elevation.setStyleSheet(''' font-size: 22px; ''')
         
-        #self.satellite_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        #self.mode_selector.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        for d in demod_list:
+            self.demod_selector.addItem(d)
         
+        self.line_sep_1.setStyleSheet("background-color: #ff1744;");
+        self.line_sep_2.setStyleSheet("background-color: #ff1744;");
+        self.line_sep_3.setStyleSheet("background-color: #ff1744;");
+        self.line_sep_4.setStyleSheet("background-color: #ff1744;");
+        self.line_sep_5.setStyleSheet("background-color: #ff1744;");
         
+        self.pass_chart = plt.figure()
+        self.pass_chart.tight_layout()
         
+        self.polarplot_widget = FigureCanvasQTAgg(self.pass_chart)
+        self.polarplot_widget.setParent(self.current_pass_tab)
+        self.pushButton.clicked.connect(self.plot_graph)
+        self.tabWidget.setCurrentIndex(0) 
+          
         self.comboboxSAT_set_entries()
         self.comboboxMode_set_entries(0)
         self.update_selected_tpx(0)
         self.update_frequencies(0)
         
         self.satellite_selector.currentIndexChanged.connect(self.comboboxMode_set_entries)
-        self.satellite_selector.currentIndexChanged.connect(self.plot_graph)
         self.mode_selector.currentIndexChanged.connect(self.update_selected_tpx)
         self.slider_tpx.valueChanged.connect(self.update_tpx_offset)
-        # Unused, WIP
         self.demod_selector.currentIndexChanged.connect(self.update_selected_demod)
+        self.tabWidget.currentChanged.connect(self.update_tab_widget)
                 
         if (is_rpi == 1):
             enc_vfo = Encoder(16, 20, 21, self.valueChanged_VFO)
@@ -700,8 +652,7 @@ class Ui(QtWidgets.QMainWindow):
         
         uplink_thread.started.connect(uplink_tx_worker.run)
         uplink_thread.start()     
-        
-        
+             
         self.show()
         apply_stylesheet(app, theme='dark_red.xml')
         
