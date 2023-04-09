@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
 
-# Import PyQt6 stuff
-from PyQt6 import QtWidgets, uic, QtGui
-from PyQt6.QtWidgets import * 
-from PyQt6.QtGui import * 
-from PyQt6.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
-from qt_material import apply_stylesheet
-
-import matplotlib
-matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-import numpy as np
-
 # Config parser for external config file
 import configparser
+
 # For bash calls
 import sys
 import os
@@ -45,6 +32,34 @@ try:
 except IOError:
     print("Config file missing!")
     exit()
+
+
+if (config_file['UI']['qt_version'] == "6"):
+    # Import PyQt6 stuff
+    from PyQt6 import QtWidgets, uic, QtGui
+    from PyQt6.QtWidgets import *
+    from PyQt6.QtGui import * 
+    from PyQt6.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
+    from qt_material import apply_stylesheet
+elif (config_file['UI']['qt_version'] == "5"):
+    # Import PyQt5 stuff
+    from PyQt5 import QtWidgets, uic, QtGui
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import * 
+    from PyQt5.QtCore import Qt,QTimer,QDateTime,QObject, QThread, pyqtSignal, QProcess, QSize
+    from qt_material import apply_stylesheet
+else:
+    print("Unsupported PyQt Version:" + (config_file['UI']['qt_version']) + " -> Use PyQt5 or PyQt6")
+    exit()
+
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import numpy as np
+    
+    
   
 ### Setup QTH and Satellite information
 qth = (config_file['QTH']['latitude'],config_file['QTH']['longitude'],config_file['QTH']['elevation'])
