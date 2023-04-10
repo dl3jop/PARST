@@ -480,6 +480,7 @@ class Ui(QtWidgets.QMainWindow):
             
         # Update GUI after new selection
         # manually triggerd here once just in case
+        self.update_doppler()
         self.update_frequency_labels()
     
     
