@@ -552,7 +552,7 @@ class Ui(QtWidgets.QMainWindow):
             
             myFreqs.sdr_shift = float(myFreqs.sdr_pll_freq - myFreqs.current_downlink)/myFreqs.sdr_samplerate
             os.write(csdr_shift_fifo_file,str.encode("%+.6f\n" % myFreqs.sdr_shift))
-        elif(demod_chain == "1"):
+        elif(demod_chain == "1" or demod_chain == "2"):
             try:
                 s.connect(("127.0.0.1", 6020))
                 update_freq_simple_demod(myFreqs.current_rig_downlink)
