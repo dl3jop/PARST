@@ -17,10 +17,6 @@ import json
 import socket
 import six
 import struct
-# Communication with Rig
-import serial
-import Hamlib
-
 import signal
 
 # Import external functions
@@ -58,6 +54,7 @@ else:
     print("Unsupported PyQt Version:" + (config_file['UI']['qt_version']) + " -> Use PyQt5 or PyQt6")
     exit()
 
+# import dependencies for pass plotter
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -65,15 +62,60 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 from math import radians
-    
-    
+
+
+
+### Catalog with Satellite Data
+mySats = SatCatalog()
+
+### frequency management  
+myFreqs = FreqManager()
+
+### rig manager
+myRig = RigManager()
+
+
+# Communication with Rig
+if (config_file['RIG_UPLINK']['enable_rig_uplink'] == "1" or config_file['RIG_DOWNLINK']['enable_rig_downlink'] == "1"):
+    import serial
+    import Hamlib
+
+if (config_file['RIG_UPLINK']['enable_rig_uplink'] == "1"):
+    global tx_rig
+    if (config_file['RIG_UPLINK']['debug'] == "0"):
+        Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
+    else:
+        Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_VERBOSE)
+        
+    tx_rig = Hamlib.Rig(int(config_file['RIG_UPLINK']['rig_model']))
+    tx_rig.set_conf("rig_pathname", config_file['RIG_UPLINK']['rig_port'])
+    tx_rig.set_conf("retry", "5")
+    try:
+        tx_rig.open()
+        myRig.rig_uplink_connected = 1
+    except:
+        myrig.rig_uplink_connected = 0
+
+if (config_file['RIG_DOWNLINK']['enable_rig_downlink'] == "1"):
+    global rx_rig
+    if (config_file['RIG_DOWNLINK']['debug'] == "0"):
+        Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
+    else:
+        Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_VERBOSE)
+        
+    rx_rig = Hamlib.Rig(int(config_file['RIG_DOWNLINK']['rig_model']))
+    rx_rig.set_conf("rig_pathname", config_file['RIG_DOWNLINK']['rig_port'])
+    rx_rig.set_conf("retry", "5")
+    try:
+        rx_rig.open()
+        myRig.rig_downlink_connected = 1
+    except:
+        myrig.rig_downlink_connected = 0
   
 ### Setup QTH and Satellite information
 qth = (config_file['QTH']['latitude'],config_file['QTH']['longitude'],config_file['QTH']['elevation'])
 wanted_sats = config_file['SATS'].getlist('sat_list')
-# Satellite TLE and transponder files
-tle_file_path = "amsat-tle.txt"
-json_file_path = "satnogs.json"
+
 
 ### check if the system is a rpi ## needs to be fixed
 is_rpi = 0
@@ -84,13 +126,11 @@ if (os.uname()[1] == 'raspberrypi'):
     GPIO.setmode(GPIO.BCM)
     is_rpi = 1
 
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 ### which demodulator chain should be used?
 demod_chain = config_file['SDR']['demod_chain'];
 ### Setting up pipe to control shift for csdr
 csdr_shift_fifo_path =  config_file['SDR']['demod_freq_shift_pipe'];
-
 if(demod_chain == "0"):
     try:
         os.remove(csdr_shift_fifo_path)
@@ -108,83 +148,61 @@ if(demod_chain == "0"):
         csdr_shift_fifo_file = os.open(csdr_shift_fifo_path, os.O_RDWR)
     except:
         print("Error opening FIFO, exiting...")
-  
 
-
-
-nmux_proc = QProcess()
-demod_proc = QProcess()
-rtl_tcp_proc = QProcess()
-sdr_demod_simple_proc = QProcess()
-
-sdr_hybrid_iq_proc = QProcess()
-sdr_hybrid_demod_proc = QProcess()
-
-# Halmlib config
-Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
-tx_rig = Hamlib.Rig(Hamlib.RIG_MODEL_FT818)
-tx_rig.set_conf("rig_pathname", "/dev/ttyUSB0")
-tx_rig.set_conf("retry", "5")
-
-
-
-
-
+if(demod_chain != "-1"):
+    global s
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    nmux_proc = QProcess()
+    demod_proc = QProcess()
+    rtl_tcp_proc = QProcess()
+    sdr_demod_simple_proc = QProcess()
+    sdr_hybrid_iq_proc = QProcess()
+    sdr_hybrid_demod_proc = QProcess()
 
 # split TLE into triple lists
 def triple(l, n):
   return [l[i:i+n] for i in range(0, len(l), n)]
-  
-   
-# Catalog with Satellite Data
-mySats = SatCatalog()
-
-
-### frequency management  
-myFreqs = FreqManager()
-
-
-### rig manager
-myRig = RigManager()
-
-
 
 ### TLE file 
-tle_file = open(tle_file_path, 'r')
+tle_file = open(config_file['SAT_DATA']['tle_path'], 'r')
 if tle_file == None:
     print("TLE file missing")
     exit()
 tle_triple = triple(tle_file.readlines(), 3)
 
 ### TPX file from satnogs
-tpx_file = open(json_file_path, 'r')
+tpx_file = open(config_file['SAT_DATA']['db_path'], 'r')
 if tpx_file == None:
     print("TPX file missing")
     exit()
 tpx_data = json.loads(tpx_file.read())
 
 
-try:
-    tx_rig.open()
-    myRig.rig_uplink_connected = 1
-except:
-    myrig.rig_uplink_connected = 0
-
 class uplink_tx(QObject):
-    
-    
     def __init__(self):
         super().__init__()
         print("Uplink TX Init")
-    
     def run(self):
         while 1:
             diff = abs(int(myFreqs.current_rig_uplink*1e6)-int(myFreqs.old_rig_uplink*1e6))
-            if myRig.trigger_uplink_changed == 1 and diff >= 10 and int(myFreqs.current_rig_uplink) > 1:
+            if myRig.trigger_uplink_changed == 1 and diff >= int(config_file['RIG_UPLINK']['update_diff']) and int(myFreqs.current_rig_uplink) > 1:
                 myFreqs.old_rig_uplink = myFreqs.current_rig_uplink
                 tx_rig.set_freq(Hamlib.RIG_VFO_A,float(int(myFreqs.current_rig_uplink*1e6)))
                 myRig.trigger_uplink_changed = 0
-            time.sleep(0.4)
+            time.sleep(int(config_file['RIG_UPLINK']['update_rate'])/1000)
+                        
+class downlink_rx(QObject):
+    def __init__(self):
+        super().__init__()
+        print("Downlink RX Init")
+    def run(self):
+        while 1:
+            diff = abs(int(myFreqs.current_rig_downlink*1e6)-int(myFreqs.old_rig_downlink*1e6))
+            if myRig.trigger_uplink_changed == 1 and diff >= int(config_file['RIG_DOWNLINK']['update_diff']) and int(myFreqs.current_rig_downlink) > 1:
+                myFreqs.old_rig_downlink = myFreqs.current_rig_downlink
+                rx_rig.set_freq(Hamlib.RIG_VFO_A,float(int(myFreqs.current_rig_downlink*1e6)))
+                myRig.trigger_downlink_changed = 0
+            time.sleep(int(config_file['RIG_UPLINK']['update_rate'])/1000)                        
                 
 class sdr_rx(QObject):
 
@@ -440,7 +458,8 @@ class Ui(QtWidgets.QMainWindow):
         
         if (myRig.rig_uplink_connected== 1):
             myRig.trigger_uplink_changed = 1
-            #tx_rig.set_freq(Hamlib.RIG_VFO_A,float(int(myFreqs.current_rig_uplink*1e6)))
+        if (myRig.rig_downlink_connected== 1):
+            myRig.trigger_downlink_changed = 1    
             
         if(demod_chain == "0"):
             if (myFreqs.current_downlink < 28000000):
@@ -541,19 +560,26 @@ class Ui(QtWidgets.QMainWindow):
         doppler_timer.timeout.connect(self.update_doppler)
         doppler_timer.start(500)
         
-        sdr_rx_worker = sdr_rx()
-        sdr_rx_thread = QThread(parent=self)
-        sdr_rx_worker.moveToThread(sdr_rx_thread)
-
-        sdr_rx_thread.started.connect(sdr_rx_worker.run)
-        sdr_rx_thread.start()        
-    
-        uplink_tx_worker = uplink_tx()
-        uplink_thread = QThread(parent=self)
-        uplink_tx_worker.moveToThread(uplink_thread)
         
-        uplink_thread.started.connect(uplink_tx_worker.run)
-        uplink_thread.start()     
+        if (config_file['SDR']['demod_chain'] != "-1"):
+            sdr_rx_worker = sdr_rx()
+            sdr_rx_thread = QThread(parent=self)
+            sdr_rx_worker.moveToThread(sdr_rx_thread)
+            sdr_rx_thread.started.connect(sdr_rx_worker.run)
+            sdr_rx_thread.start()        
+    
+        if (config_file['RIG_UPLINK']['enable_rig_uplink'] == "1"):
+            uplink_tx_worker = uplink_tx()
+            uplink_thread = QThread(parent=self)
+            uplink_tx_worker.moveToThread(uplink_thread)
+            uplink_thread.started.connect(uplink_tx_worker.run)
+            uplink_thread.start()
+        if (config_file['RIG_DOWNLINK']['enable_rig_downlink'] == "1"):
+            downlink_rx_worker = downlink_rx()
+            downlink_thread = QThread(parent=self)
+            downlink_rx_worker.moveToThread(downlink_thread)
+            downlink_thread.started.connect(downlink_rx_worker.run)
+            downlink_thread.start()  
              
         self.show()
         apply_stylesheet(app, theme='dark_red.xml')
@@ -578,12 +604,13 @@ class Ui(QtWidgets.QMainWindow):
 		
 
 def application_exit_handler():
-    os.kill(rtl_tcp_proc.processId(), signal.SIGKILL)
-    os.kill(demod_proc.processId(), signal.SIGKILL)
-    os.kill(nmux_proc.processId(), signal.SIGKILL)
-    os.kill(sdr_demod_simple_proc.processId(), signal.SIGKILL)
-    os.kill(sdr_hybrid_iq_proc.processId(), signal.SIGKILL)
-    os.kill(sdr_hybrid_demod_proc.processId(), signal.SIGKILL)
+    if (config_file['SDR']['demod_chain'] != "-1"):
+        os.kill(rtl_tcp_proc.processId(), signal.SIGKILL)
+        os.kill(demod_proc.processId(), signal.SIGKILL)
+        os.kill(nmux_proc.processId(), signal.SIGKILL)
+        os.kill(sdr_demod_simple_proc.processId(), signal.SIGKILL)
+        os.kill(sdr_hybrid_iq_proc.processId(), signal.SIGKILL)
+        os.kill(sdr_hybrid_demod_proc.processId(), signal.SIGKILL)
     
 
 app = QtWidgets.QApplication(sys.argv)

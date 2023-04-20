@@ -5,3 +5,4 @@ class RigManager:
     rig_uplink_connected = 0
     rig_downlink_connected = 0
     trigger_uplink_changed = 0
+    trigger_downlink_changed = 0
