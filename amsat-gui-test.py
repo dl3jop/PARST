@@ -23,6 +23,12 @@ import Hamlib
 
 import signal
 
+# Import external functions
+from sdr_control import *
+from freq_manager import *
+from rig_manager import *
+from sat_manager import *
+
 ### Load config file
 config_file = configparser.ConfigParser(converters={'list': lambda x: [i.strip() for i in x.split(',')]})
 config_file.sections()
@@ -65,6 +71,9 @@ from math import radians
 ### Setup QTH and Satellite information
 qth = (config_file['QTH']['latitude'],config_file['QTH']['longitude'],config_file['QTH']['elevation'])
 wanted_sats = config_file['SATS'].getlist('sat_list')
+# Satellite TLE and transponder files
+tle_file_path = "amsat-tle.txt"
+json_file_path = "satnogs.json"
 
 ### check if the system is a rpi ## needs to be fixed
 is_rpi = 0
@@ -75,12 +84,12 @@ if (os.uname()[1] == 'raspberrypi'):
     GPIO.setmode(GPIO.BCM)
     is_rpi = 1
 
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 ### which demodulator chain should be used?
 demod_chain = config_file['SDR']['demod_chain'];
-
-
 ### Setting up pipe to control shift for csdr
-csdr_shift_fifo_path = 'sdr_rx_tune_pipe'
+csdr_shift_fifo_path =  config_file['SDR']['demod_freq_shift_pipe'];
 
 if(demod_chain == "0"):
     try:
@@ -101,30 +110,7 @@ if(demod_chain == "0"):
         print("Error opening FIFO, exiting...")
   
 
-### SDR commands
 
-### rtl_tcp + nmux + csdr -> heavy but allows multiple commands in parallel
-rtl_tcp_command = "rtl_tcp -a 127.0.0.1 -s 2.4M -p 4950 -f 145.5M -g 20 "
-csdr_lsb_command = "bash -c \"(for anything in {0..10}; do ncat 127.0.0.1 4952; sleep .3; done) | csdr convert_u8_f | csdr shift_addition_cc --fifo sdr_rx_tune_pipe | csdr fir_decimate_cc 50 0.005 HAMMING | csdr bandpass_fir_fft_cc -0.1 0 0.05 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded - \""
-iq_mux_command = "bash -c \"(for anything in {0..10}; do ncat 127.0.0.1 4950; sleep .3; done) | nmux -p 4952 -a 127.0.0.1 -b 1024 -n 30\""
-
-### better for older hardware like Raspberry Pi 2 and alike 
-## FM
-sdr_simple_command = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -g 20 - | csdr convert_s16_f | csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
-
-### hybrid version
-sdr_hybrid_iq = "bash -c \"rtl_udp -F -f 144500000 -s 48000 -R -C -g 20 - | csdr convert_s16_f| nmux -p 4952 -a 127.0.0.1 -b 1024 -n 30 \""
-sdr_hybrid_command_usb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc 0.01 0.17 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
-sdr_hybrid_command_lsb = "bash -c \"nc -v localhost 4952 |csdr bandpass_fir_fft_cc -0.17 -0.01 0.002 | csdr realpart_cf | csdr agc_ff | csdr limit_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
-sdr_hybrid_command_nfm = "bash -c \"nc -v localhost 4952 |csdr fmdemod_quadri_cf | csdr limit_ff | csdr deemphasis_nfm_ff 48000 | csdr fastagc_ff | csdr convert_f_s16 | play -r 48000 -t s16 -L -c 1 --multi-threaded -\""
-sdr_hybrid_command_mute = ""
-
-demod_list = "NFM", "LSB", "USB", "Mute"
-demod_command_list = [sdr_hybrid_command_nfm, sdr_hybrid_command_lsb, sdr_hybrid_command_usb, sdr_hybrid_command_mute]
-##
-
-
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 nmux_proc = QProcess()
 demod_proc = QProcess()
@@ -141,9 +127,7 @@ tx_rig.set_conf("rig_pathname", "/dev/ttyUSB0")
 tx_rig.set_conf("retry", "5")
 
 
-# satellite tle and transponder files
-tle_file_path = "amsat-tle.txt"
-json_file_path = "satnogs.json"
+
 
 
 
@@ -151,99 +135,16 @@ json_file_path = "satnogs.json"
 def triple(l, n):
   return [l[i:i+n] for i in range(0, len(l), n)]
   
-  
-def update_freq_simple_demod(freq):
-    data = "" +chr(0)
-    i = 0
-    freq = int(freq*(1e6))
-    # print("Updated sdr demod")
-    while i < 4:
-        data = data +chr(freq & 0xff)
-        freq = freq >> 8
-        i=i+1
-    s.send(six.b(data))
-        
-def update_demod_simple_demod(demod):
-    data = "" +chr(1)
-    print("## Updated sdr demod")
-    i = 0
-    while i < 4:
-        data = data +chr(demod & 0xff)
-        demod = demod >> 8
-        i=i+1
-    # s.send(six.b(data))
-    
+   
 # Catalog with Satellite Data
-class SatCatalog:
-    tracker_list=[]
-    name_list=[]
-    id_list=[]
-    tpx_list=[[]]
-    tpx_freq_list=[[]]
-    current_sat = 0
-    current_sat_azi = 0;
-    current_sat_ele = 0;
-	
 mySats = SatCatalog()
 
 
-### frequency management
-class FreqManager:
-	# data from satnogs json
-    sat_uplink_low = 0;
-    sat_uplink_high = 0;
-    sat_downlink_low = 0;
-    sat_downlink_high = 0;
-    sat_is_linear = 0;
-    sat_bandwidth = 0;
-    
-    # currently applied RIT
-    rit = 0;
-    
-    # Frequencies after doppler correction, RIT not applied
-    current_uplink = 0;
-    current_downlink = 0;
-    
-    # Current selected TPX of Sat
-    current_tpx = 0;
-    current_demod = 0;
-    
-    # doppler shifts
-    doppler_up = 0;
-    doppler_down = 0;
-    
-    # Current offset from TPX middle  
-    current_tpx_offset = 0;
-    
-    # TPX inversion type
-    current_tpx_inversion = 1;
-    
-    
-    # Current HW frequency
-    current_rig_uplink = 0;
-    current_rig_downlink = 0;
-    
-    old_rig_uplink = 0;
-    old_rig_downlink = 0;
-    
-    
-    # SDR PLL frequency
-    sdr_pll_freq = 145500000;
-    # difference PLL to RX frequency 
-    sdr_shift = 0;
-    sdr_samplerate = 2400000;
-    
+### frequency management  
 myFreqs = FreqManager()
 
 
 ### rig manager
-class RigManager:
-    rig_name_uplink = "FT818"
-    rig_name_downlink = "SDR"
-    rig_uplink_connected = 0
-    rig_downlink_connected = 0
-    trigger_uplink_changed = 0
-
 myRig = RigManager()
 
 

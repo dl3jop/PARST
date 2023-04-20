@@ -63,7 +63,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="setup_tab">
        <property name="sizePolicy">
@@ -107,7 +107,6 @@
                <font>
                 <family>Nasalization</family>
                 <pointsize>13</pointsize>
-                <weight>50</weight>
                 <italic>false</italic>
                 <bold>false</bold>
                </font>
@@ -144,7 +143,6 @@
                <font>
                 <family>Nasalization</family>
                 <pointsize>13</pointsize>
-                <weight>50</weight>
                 <italic>false</italic>
                 <bold>false</bold>
                </font>
@@ -813,6 +811,11 @@
          </layout>
         </item>
        </layout>
+      </widget>
+      <widget class="QWidget" name="spectrum_tab">
+       <attribute name="title">
+        <string>Spectrum</string>
+       </attribute>
       </widget>
       <widget class="QWidget" name="tab">
        <attribute name="title">
